@@ -1,0 +1,36 @@
+/* :root {
+  background-color: #333;
+  color: #eee;
+} */
+
+/* 去除默认的外边距和内边距 */
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* 设置文本颜色、字体和大小 */
+body {
+  color: #333;
+  font-family: Arial, sans-serif;
+  font-size: 16px;
+  padding: 10PX;
+}
+
+/* 设置链接颜色和样式 */
+a {
+  color: #07c;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* 设置列表样式 */
+ul, ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
