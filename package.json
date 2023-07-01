@@ -18,7 +18,7 @@
     "@types/request-promise": "^4.1.48",
     "@vitejs/plugin-vue": "^4.1.0",
     "electron": "^24.1.2",
-    "electron-builder": "^23.6.0",
+    "electron-builder": "^24.4.0",
     "sass": "^1.62.0",
     "typescript": "^5.0.2",
     "unplugin-auto-import": "^0.15.3",
