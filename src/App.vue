@@ -127,7 +127,7 @@ watch(proxyEnable, async (newVal) => {
 })
 
 watch(proxySetting, async (newVal) => {
-  buttonShowFlag.value = !!newVal
+  buttonShowFlag.value = localStorage.getItem("proxySetting") !== newVal
 })
 
 async function applyProxy() {
@@ -323,30 +323,28 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div style="width: 700px; user-select: none;">
-    <el-row>
-      <div class="top-item">
-        <el-checkbox v-model="alwaysOnTop">窗口置顶</el-checkbox>
-        &nbsp;&nbsp;
-        <el-checkbox v-model="proxyEnable">开启代理</el-checkbox>
-        <span v-if="proxyEnable">&nbsp;&nbsp;</span>
-        <el-input v-if="proxyEnable" v-model="proxySetting" size="small"></el-input>
-        <span v-if="buttonShowFlag && !!proxySetting">&nbsp;&nbsp;</span>
-        <el-button v-if="buttonShowFlag && !!proxySetting" @click="applyProxy">测试&应用代理</el-button>
-      </div>
-    </el-row>
-    <el-row class="search">
-      <el-select v-model.trim="selectedPair" placeholder="请选择" size="small" style="width: 240px" clearable filterable>
-        <el-option v-for="pair in allPairs" :key="pair.symbol" :label="pair.symbol" :value="pair.symbol"
-          :disabled="coinList.includes(pair.symbol)" />
+  <div style="width: 900px; user-select: none;">
+    <div class="top-item">
+      <el-checkbox v-model="alwaysOnTop">窗口置顶</el-checkbox>
+      &nbsp;&nbsp;
+      <el-checkbox v-model="proxyEnable">开启代理</el-checkbox>
+      <span v-if="proxyEnable">&nbsp;&nbsp;</span>
+      <el-input v-if="proxyEnable" v-model="proxySetting" size="small" style="width: 120px;height: 24px;"></el-input>
+      <span v-if="buttonShowFlag && !!proxySetting">&nbsp;&nbsp;</span>
+      <el-button v-if="buttonShowFlag && !!proxySetting" @click="applyProxy" style="height: 24px;">测试&应用代理</el-button>
+      &nbsp;&nbsp;
+      <el-select v-model.trim="selectedPair" placeholder="请选择" size="small" style="width: 120px" clearable filterable>
+        <el-option v-for="pair in allPairs.filter(p => !coinList.includes(p.symbol))" :key="pair.symbol"
+          :label="pair.symbol" :value="pair.symbol" style="user-select: none;" />
       </el-select>
       &nbsp;&nbsp;
       <el-button @click="add" size="small" :disabled="!selectedPair">添加</el-button>
       &nbsp;&nbsp;
       <el-text style="color: gray;user-select: none;">注：bitget 数据</el-text>
-    </el-row>
-    <el-table v-if="allPairMap.size > 0" id="dragTable" :data="coinList" :row-key="item => item" :border="true" style="">
-      <el-table-column label="名称" width="180">
+    </div>
+    <el-table v-if="allPairMap.size > 0" id="dragTable" :data="coinList" :row-key="item => item"
+      height="calc(100vh - 65px)" fit>
+      <el-table-column label="名称">
         <template #default="scope">
           <span class="basecoin">{{
             `${allPairMap.get(scope.row)?.baseCoin}_${allPairMap.get(scope.row)?.quoteCoin}`
@@ -358,21 +356,22 @@ onMounted(async () => {
           {{ coinListMap.get(scope.row)?.last }}
         </template>
       </el-table-column>
-      <el-table-column label="变化" width="100">
+      <el-table-column label="变化">
         <template #default="scope">
-          <span :style="{ color: Number(coinListMap.get(scope.row)?.chgUTC) < 0 ? 'red' : 'green' }">
+          <span v-show="!isNaN(Number(coinListMap.get(scope.row)?.chgUTC))"
+            :style="{ color: Number(coinListMap.get(scope.row)?.chgUTC) < 0 ? 'red' : 'green' }">
             {{ (Number(coinListMap.get(scope.row)?.chgUTC) * 100).toFixed(2) }} %
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="130">
+      <el-table-column label="操作">
         <template #default="scope">
           <el-button size="small" class="handleDrag">
             <el-icon>
               <Sort />
             </el-icon></el-button>
           <el-popconfirm title="确定删除？" confirmButtonText="确定" cancelButtonText="取消" @confirm="remove(scope.row)">
-            <template #reference><el-button size="small" type="danger">删除</el-button></template>
+            <template #reference><el-button size="small">删除</el-button></template>
           </el-popconfirm>
         </template>
       </el-table-column>
@@ -387,6 +386,8 @@ onMounted(async () => {
 
 .top-item {
   display: flex;
+  align-items: center;
+  margin-bottom: 10px;
 }
 
 .refreshButton {
@@ -399,5 +400,9 @@ onMounted(async () => {
 
 .list-item {
   margin-bottom: 10px;
+}
+
+::v-deep(.el-table__inner-wrapper::before) {
+  display: none !important;
 }
 </style>
