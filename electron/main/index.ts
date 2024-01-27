@@ -1,9 +1,9 @@
 import { app, BrowserWindow, shell, ipcMain, Menu } from 'electron'
-import { el } from 'element-plus/es/locale';
+import { el } from 'element-plus/es/locale'
 import { release } from 'node:os'
 import { join } from 'node:path'
 
-Menu.setApplicationMenu(null);
+Menu.setApplicationMenu(null)
 
 // The built directory structure
 //
@@ -119,12 +119,17 @@ ipcMain.handle('open-win', (_, arg) => {
   } else {
     childWindow.loadFile(indexHtml, { hash: arg })
   }
-});
+})
 
 ipcMain.on("set-proxy", function (event, { proxy, enable }) {
   if (enable) {
-    win.webContents.session.setProxy({ proxyRules: proxy });
+    win.webContents.session.setProxy({ proxyRules: proxy })
   } else {
-    win.webContents.session.setProxy({ proxyRules: null });
+    win.webContents.session.setProxy({ proxyRules: null })
   }
-});
+})
+
+ipcMain.on("set-always-top", function (event, alwaysOnTop: boolean) {
+  console.log("alwaysOnTop", alwaysOnTop)
+  win?.setAlwaysOnTop(alwaysOnTop)
+})
