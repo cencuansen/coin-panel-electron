@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, shell, ipcMain, Menu, globalShortcut, Tray } from 'electron'
 import { el } from 'element-plus/es/locale'
 import { release } from 'node:os'
 import { join } from 'node:path'
@@ -42,10 +42,14 @@ let win: BrowserWindow | null = null
 const preload = join(__dirname, '../preload/index.js')
 const url = process.env.VITE_DEV_SERVER_URL
 const indexHtml = join(process.env.DIST, 'index.html')
+let isDevToolsOpen = false
+let tray = null
 
 async function createWindow() {
   win = new BrowserWindow({
-    title: 'Main window',
+    title: '',
+    minWidth: 220,
+    minHeight: 100,
     icon: join(process.env.PUBLIC, 'favicon.ico'),
     webPreferences: {
       preload,
@@ -62,7 +66,7 @@ async function createWindow() {
   if (process.env.VITE_DEV_SERVER_URL) { // electron-vite-vue#298
     win.loadURL(url)
     // Open devTool if the app is not packaged
-    win.webContents.openDevTools({ mode: 'bottom' })
+    // win.webContents.openDevTools({ mode: 'bottom' })
   } else {
     win.loadFile(indexHtml)
   }
@@ -78,9 +82,25 @@ async function createWindow() {
     return { action: 'deny' }
   })
   // win.webContents.on('will-navigate', (event, url) => { }) #344
+
+  win.on('close', (e) => {
+    // 阻止默认关闭行为，点击托盘栏就能恢复
+    e.preventDefault()
+    win.hide()
+    win.setSkipTaskbar(true)
+  })
 }
 
-app.whenReady().then(createWindow)
+app.whenReady()
+  .then(async () => {
+    await createWindow()
+    initTray()
+    globalShortcut.register('ctrl+f12', ctrlF12Shortcut)
+  })
+
+app.on('will-quit', function () {
+  globalShortcut.unregisterAll()
+})
 
 app.on('window-all-closed', () => {
   win = null
@@ -89,7 +109,6 @@ app.on('window-all-closed', () => {
 
 app.on('second-instance', () => {
   if (win) {
-    // Focus on the main window if the user tried to open another
     if (win.isMinimized()) win.restore()
     win.focus()
   }
@@ -132,3 +151,45 @@ ipcMain.on("set-proxy", function (event, { proxy, enable }) {
 ipcMain.on("set-always-top", function (event, alwaysOnTop: boolean) {
   win?.setAlwaysOnTop(alwaysOnTop)
 })
+
+ipcMain.on("toggle-devtools", function (event, open: boolean) {
+  if (open) {
+    win?.webContents.openDevTools({ mode: 'bottom' })
+  } else {
+    win?.webContents.closeDevTools()
+  }
+  isDevToolsOpen = open
+})
+
+function ctrlF12Shortcut() {
+  win.restore()
+  win.focus()
+  if (isDevToolsOpen) {
+    win?.webContents.closeDevTools()
+  } else {
+    win?.webContents.openDevTools({ mode: 'bottom' })
+  }
+  isDevToolsOpen = !isDevToolsOpen
+}
+
+function initTray() {
+  tray = new Tray(join(process.env.PUBLIC, 'favicon.ico'))
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: '退出', click: function () {
+        win.destroy()
+        win = null
+        app.quit()
+      }
+    }
+  ])
+  tray.setToolTip('Coin Panel')
+  tray.setContextMenu(contextMenu)
+  tray.on('click', () => {
+    win.show()
+    win.setSkipTaskbar(false)
+  })
+}
+
+
+

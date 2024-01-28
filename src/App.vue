@@ -7,6 +7,7 @@ import { ipcRenderer } from "electron"
 import { bgHttpHost, bgWsHost, bgApis } from "./bitget/apis"
 import { TickerData, SnapshotResponse, SubscribeResponse, ApiResponse, TradingPair, TradingPairsResponse } from "./bitget/types"
 
+const devtoolsStatus = ref<boolean>(false)
 const alwaysOnTop = ref<boolean>(false)
 const proxySetting = ref<string>("127.0.0.1:10800")
 const proxyEnable = ref<boolean>(true)
@@ -18,6 +19,10 @@ const selectedPair = ref<string>("")
 const coinList = ref<string[]>(["BTCUSDT"])
 const allPairMap = ref<Map<string, TradingPair>>(new Map<string, TradingPair>())
 const coinListMap = ref<Map<string, TickerData | null>>(new Map<string, TickerData>)
+
+watch(devtoolsStatus, (newVal) => {
+  ipcRenderer.send("toggle-devtools", newVal)
+})
 
 watch(alwaysOnTop, (newVal) => {
   localStorage.setItem("alwaysOnTop", `${newVal}`)
@@ -113,11 +118,14 @@ if (proxySetting.value && proxyEnable.value) {
 async function getAllPair() {
   const response = await axios.get(`${bgHttpHost}${bgApis.allPairs}`)
   const pairs: TradingPairsResponse = response.data
-  allPairs.value = pairs.data as TradingPair[]
+  let allPair = pairs.data as TradingPair[]
+  allPairs.value = allPair.filter(pair => "USDT" === pair.quoteCoin.toUpperCase())
   allPairs.value.forEach((pair: TradingPair) => {
     allPairMap.value.set(pair.symbol, pair)
   })
 }
+
+let websocket: WebSocket | null
 
 function spotSubscrib(tickers: string[]) {
   if (!tickers) { return }
@@ -149,41 +157,54 @@ function spotUnsubscrib(tickers: string[]) {
   websocket?.send(JSON.stringify(sub))
 }
 
-let websocket: WebSocket | null = new WebSocket(bgWsHost)
-websocket.onopen = function () {
-  setInterval(() => {
-    websocket?.send("ping")
-  }, 30 * 1000)
-  spotSubscrib(coinList.value)
+function wsConnect() {
+  websocket = new WebSocket(bgWsHost)
+  websocket.onopen = function () {
+    setInterval(() => {
+      websocket?.send("ping")
+    }, 30 * 1000)
+    spotSubscrib(coinList.value)
+  }
+  websocket.onmessage = function (e: MessageEvent<any>) {
+    if ('pong' === e.data) {
+      return
+    }
+    const message: ApiResponse = JSON.parse(e.data)
+    if ("error" === message.event) {
+      console.error("response error", message)
+      return
+    }
+    if ("subscribe" === message.event) {
+      console.log("subscribe success", message.arg.instId)
+      return
+    }
+    if ("unsubscribe" === message.event) {
+      console.log("unsubscribe success", message.arg.instId)
+      return
+    }
+    if (message.data && Array.isArray(message.data) && message.data.length > 0) {
+      const data: TickerData = message.data[0]
+      coinListMap.value?.set(data.instId, data)
+    }
+  }
+  websocket.onerror = function () {
+    console.error("websocket error")
+    reconnect()
+  }
+  websocket.onclose = function (e) {
+    console.error("websocket closed")
+    reconnect()
+  }
 }
-websocket.onmessage = function (e: MessageEvent<any>) {
-  if ('pong' === e.data) {
-    return
-  }
-  const message: ApiResponse = JSON.parse(e.data)
-  if ("error" === message.event) {
-    console.error("response error", message)
-    return
-  }
-  if ("subscribe" === message.event) {
-    console.log("subscribe success", message.arg.instId)
-    return
-  }
-  if ("unsubscribe" === message.event) {
-    console.log("unsubscribe success", message.arg.instId)
-    return
-  }
-  if (message.data && Array.isArray(message.data) && message.data.length > 0) {
-    const data: TickerData = message.data[0]
-    coinListMap.value?.set(data.instId, data)
-  }
+
+function reconnect() {
+  setTimeout(() => {
+    console.error("websocket try reconnect")
+    wsConnect()
+  }, 1000)
 }
-websocket.onerror = function () {
-  console.error("websocket error")
-}
-websocket.onclose = function (e) {
-  console.error("websocket closed")
-}
+
+wsConnect()
 
 function add() {
   if (!selectedPair.value) {
@@ -238,13 +259,74 @@ function openLink(symbol: string) {
 onMounted(async () => {
   // 拖动
   setSort()
-});
+})
+
+const windowWith = ref<number>(9999)
+
+function throttle(func: Function, wait: number | undefined) {
+  // 节流函数
+  let timer: NodeJS.Timeout | null
+  return function (this: any) {
+    if (!timer) {
+      func.apply(this, arguments)
+      timer = setTimeout(() => {
+        timer = null
+      }, wait)
+    }
+  }
+}
+function onWindowResize() {
+  windowWith.value = window.innerWidth
+}
+const throttledResize = throttle(onWindowResize, 30)
+window.addEventListener("resize", throttledResize)
+
+function colorFunc(row: string) {
+  let item: TickerData | null | undefined = coinListMap.value.get(row)
+  if (!item) {
+    return ""
+  }
+  let num = Number(item.chgUTC)
+  if (isNaN(num)) {
+    return ""
+  }
+  return num < 0 ? 'red' : 'green'
+}
+
+function priceFunc(price: string | undefined) {
+  if (!price) {
+    return ""
+  }
+  let num = Number(price)
+  if (isNaN(num)) {
+    return ""
+  }
+  if (num * 1000 < 1) {
+    let fractional = price.split(".")[1]
+    let nonZeroIndex: number = fractional.split("").findIndex(c => Number(c) > 0)
+    let nonZeroPart = fractional.substring(nonZeroIndex, Math.min(nonZeroIndex + 3, fractional.length))
+    return `0.0{${nonZeroIndex}}${nonZeroPart}`
+  }
+  return Number(num.toFixed(3))
+}
+
+function priceTitleFunc(row: string | undefined) {
+  if (!row) {
+    return
+  }
+  let title = ""
+  title = windowWith.value < 450 ? `变化：${(Number(coinListMap.value.get(row)?.chgUTC) * 100).toFixed(2)} %` : ""
+  title = (windowWith.value < 250 ? `名称：${allPairMap.value.get(row)?.baseCoin}\r\n` : "") + title
+  return title
+}
 
 </script>
 
 <template>
-  <div style="width: 700px; user-select: none;">
-    <div class="top-item">
+  <div style="min-width: 210px;user-select: none;">
+    <div class="top-item" v-if="windowWith >= 700">
+      <el-checkbox v-model="devtoolsStatus">devtools</el-checkbox>
+      &nbsp;&nbsp;
       <el-checkbox v-model="alwaysOnTop">窗口置顶</el-checkbox>
       &nbsp;&nbsp;
       <el-checkbox v-model="proxyEnable">开启代理</el-checkbox>
@@ -263,28 +345,32 @@ onMounted(async () => {
       &nbsp;&nbsp;
       <el-text style="color: gray;">数据来自 bitget</el-text>
     </div>
-    <el-table id="dragTable" :data="coinList" :row-key="item => item" empty-text="暂无数据" height="calc(100vh - 65px)" fit>
-      <el-table-column label="名称">
+    <el-table id="dragTable" style="font-weight: bold;" :data="coinList" :row-key="item => item" empty-text="暂无数据"
+      :show-header="false" fit>
+      <el-table-column label="名称" :show-overflow-tooltip="true" v-if="windowWith >= 250">
         <template #default="scope">
-          <span class="basecoin" v-show="allPairMap.get(scope.row)">{{
-            `${allPairMap.get(scope.row)?.baseCoin}_${allPairMap.get(scope.row)?.quoteCoin}`
-          }}</span>
+          <span class="basecoin" v-show="allPairMap.get(scope.row)" :title="void (0)" :style="void (0)">
+            <span>{{ allPairMap.get(scope.row)?.baseCoin }}</span>
+            <span v-if="windowWith > 350">{{ `_${allPairMap.get(scope.row)?.quoteCoin}` }}</span>
+          </span>
         </template>
       </el-table-column>
-      <el-table-column label="价格">
+      <el-table-column label="价格" :show-overflow-tooltip="true">
         <template #default="scope">
-          {{ coinListMap.get(scope.row)?.last }}
+          <span :style="{ color: windowWith < 450 ? colorFunc(scope.row) : 'inherit' }"
+            :title="priceTitleFunc(scope.row)">
+            {{ priceFunc(coinListMap.get(scope.row)?.last) }}
+          </span>
         </template>
       </el-table-column>
-      <el-table-column label="变化">
+      <el-table-column label="变化" v-if="windowWith >= 450">
         <template #default="scope">
-          <span v-show="!isNaN(Number(coinListMap.get(scope.row)?.chgUTC))"
-            :style="{ color: Number(coinListMap.get(scope.row)?.chgUTC) < 0 ? 'red' : 'green' }">
+          <span v-show="coinListMap.get(scope.row)" :style="{ color: colorFunc(scope.row) }">
             {{ (Number(coinListMap.get(scope.row)?.chgUTC) * 100).toFixed(2) }} %
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="操作">
+      <el-table-column label="操作" v-if="windowWith >= 600" width="160">
         <template #default="scope">
           <el-button size="small" class="handleDrag" title="移动">
             <el-icon>
