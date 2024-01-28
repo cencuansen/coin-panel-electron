@@ -1,74 +1,11 @@
 <script setup lang="ts">
-import { ElNotification } from "element-plus"
-import { onMounted, ref, watch } from 'vue'
 import axios from 'axios'
-import { ipcRenderer } from "electron"
-import { bgHttpHost, bgApis } from "./apis/bitget/apis"
 import Sortable from "sortablejs"
-
-interface TickerData {
-  instId: string
-  last: string
-  open24h: string
-  high24h: string
-  low24h: string
-  bestBid: string
-  bestAsk: string
-  baseVolume: string
-  quoteVolume: string
-  ts: number
-  labeId: number
-  openUtc: string
-  chgUTC: string
-  bidSz: string
-  askSz: string
-}
-
-interface SnapshotResponse {
-  action: string
-  arg: {
-    instType: string
-    channel: string
-    instId: string
-  }
-  data: TickerData[]
-  ts: number
-}
-
-interface SubscribeResponse {
-  event: string
-  arg: {
-    instType: string
-    channel: string
-    instId: string
-  }
-}
-
-type ApiResponse = string & SubscribeResponse & SnapshotResponse
-
-interface TradingPair {
-  symbol: string
-  baseCoin: string
-  quoteCoin: string
-  minTradeAmount: string
-  maxTradeAmount: string
-  takerFeeRate: string
-  makerFeeRate: string
-  pricePrecision: string
-  quantityPrecision: string
-  quotePrecision: string
-  status: string
-  minTradeUSDT: string
-  buyLimitPriceRatio: string
-  sellLimitPriceRatio: string
-}
-
-interface TradingPairsResponse {
-  code: string
-  msg: string
-  requestTime: number
-  data: TradingPair[]
-}
+import { shell } from "electron"
+import { onMounted, ref, watch } from "vue"
+import { ipcRenderer } from "electron"
+import { bgHttpHost, bgWsHost, bgApis } from "./bitget/apis"
+import { TickerData, SnapshotResponse, SubscribeResponse, ApiResponse, TradingPair, TradingPairsResponse } from "./bitget/types"
 
 const alwaysOnTop = ref<boolean>(false)
 const proxySetting = ref<string>("127.0.0.1:10800")
@@ -76,47 +13,16 @@ const proxyEnable = ref<boolean>(true)
 const proxyStatusOk = ref<boolean>(false)
 const buttonShowFlag = ref<boolean>(false)
 const proxyCheckServer = "https://www.google.com"
+const allPairs = ref<TradingPair[]>([])
+const selectedPair = ref<string>("")
+const coinList = ref<string[]>(["BTCUSDT"])
+const allPairMap = ref<Map<string, TradingPair>>(new Map<string, TradingPair>())
+const coinListMap = ref<Map<string, TickerData | null>>(new Map<string, TickerData>)
 
 watch(alwaysOnTop, (newVal) => {
   localStorage.setItem("alwaysOnTop", `${newVal}`)
   ipcRenderer.send("set-always-top", newVal)
 })
-
-// 开启代理
-async function setProxy() {
-  ipcRenderer.send("set-proxy", {
-    proxy: proxySetting.value,
-    enable: true,
-  })
-  const status: boolean = await proxyStatusCheck()
-  if (status) {
-    localStorage.setItem("proxyEnable", `true`)
-    localStorage.setItem("proxySetting", proxySetting.value)
-    wsConnect("wss://ws.bitgetapi.com/spot/v1/stream")
-    const allPairResponse: TradingPairsResponse = (await axios.get(`${bgHttpHost}${bgApis.allPairs}`)).data
-    allPairs.value = allPairResponse.data as TradingPair[]
-    allPairs.value.forEach((pair: TradingPair) => {
-      allPairMap.value.set(pair.symbol, pair)
-    })
-  }
-}
-
-// 关闭代理
-async function closeProxy() {
-  localStorage.setItem("proxyEnable", `false`)
-  ipcRenderer.send("set-proxy", {
-    proxy: null,
-    enable: false,
-  })
-  if (proxyStatusOk.value) {
-    ElNotification({
-      title: "代理已关闭！",
-      type: "success"
-    })
-  }
-  proxyStatusOk.value = false
-  buttonShowFlag.value = false
-}
 
 watch(proxyEnable, async (newVal) => {
   if (newVal && proxySetting.value) {
@@ -130,6 +36,31 @@ watch(proxySetting, async (newVal) => {
   buttonShowFlag.value = localStorage.getItem("proxySetting") !== newVal
 })
 
+// 开启代理
+async function setProxy() {
+  ipcRenderer.send("set-proxy", {
+    proxy: proxySetting.value,
+    enable: true,
+  })
+  const status: boolean = await proxyStatusCheck()
+  if (status) {
+    localStorage.setItem("proxyEnable", `true`)
+    localStorage.setItem("proxySetting", proxySetting.value)
+    await getAllPair()
+  }
+}
+
+// 关闭代理
+async function closeProxy() {
+  localStorage.setItem("proxyEnable", `false`)
+  ipcRenderer.send("set-proxy", {
+    proxy: null,
+    enable: false,
+  })
+  proxyStatusOk.value = false
+  buttonShowFlag.value = false
+}
+
 async function applyProxy() {
   // 开启或关闭代理
   if (proxyEnable.value && proxySetting.value) {
@@ -142,41 +73,54 @@ async function applyProxy() {
 async function proxyStatusCheck(): Promise<boolean> {
   try {
     await axios.head(proxyCheckServer)
-    ElNotification({
-      title: "代理已开启！",
-      type: "success"
-    })
     proxyStatusOk.value = true
     buttonShowFlag.value = false
     return true
   } catch (error) {
-    ElNotification({
-      title: "代理配置有误，请检查！",
-      type: "error"
-    })
     ipcRenderer.send("set-proxy", {
       proxy: null,
       enable: false,
     })
-    if (proxyStatusOk.value) {
-      proxyStatusOk.value = false
-    }
+    proxyStatusOk.value = false
     buttonShowFlag.value = true
     return false
   }
 }
 
-const allPairs = ref<TradingPair[]>([])
-const allPairMap = ref<Map<string, TradingPair>>(new Map<string, TradingPair>())
-const selectedPair = ref<string>("")
-const coinList = ref<string[]>(["BTCUSDT", "ETHUSDT"])
-const coinListMap = ref<Map<string, TickerData | null>>(new Map<string, TickerData>)
+// 加载缓存
+const cache = localStorage.getItem("coinList")
+if (cache) {
+  coinList.value = JSON.parse(cache).filter(Boolean)
+}
+// 窗口置顶
+const cachedAlwaysOnTop = localStorage.getItem("alwaysOnTop")
+if (cachedAlwaysOnTop) {
+  alwaysOnTop.value = cachedAlwaysOnTop === "true" ? true : false
+}
+// 初始化代理
+const cachedProxyEnable = localStorage.getItem("proxyEnable")
+if (cachedProxyEnable) {
+  proxyEnable.value = cachedProxyEnable === "true"
+}
+const cachedProxySetting = localStorage.getItem("proxySetting")
+if (cachedProxySetting) {
+  proxySetting.value = cachedProxySetting
+}
+if (proxySetting.value && proxyEnable.value) {
+  setProxy()
+}
 
-let websocket: WebSocket | null = null
+async function getAllPair() {
+  const response = await axios.get(`${bgHttpHost}${bgApis.allPairs}`)
+  const pairs: TradingPairsResponse = response.data
+  allPairs.value = pairs.data as TradingPair[]
+  allPairs.value.forEach((pair: TradingPair) => {
+    allPairMap.value.set(pair.symbol, pair)
+  })
+}
 
 function spotSubscrib(tickers: string[]) {
   if (!tickers) { return }
-
   let sub = {
     "op": "subscribe",
     "args": tickers.map(ticker => {
@@ -192,7 +136,6 @@ function spotSubscrib(tickers: string[]) {
 
 function spotUnsubscrib(tickers: string[]) {
   if (!tickers) { return }
-
   let sub = {
     "op": "unsubscribe",
     "args": tickers.map(ticker => {
@@ -206,51 +149,40 @@ function spotUnsubscrib(tickers: string[]) {
   websocket?.send(JSON.stringify(sub))
 }
 
-const wsConnect = (url: string) => {
-  websocket = new WebSocket(url)
-  websocket.onopen = function () {
-    console.log("连接成功")
-    setInterval(() => {
-      // 心跳
-      websocket?.send("ping")
-    }, 20 * 1000)
-    // 加载缓存
-    const cache = localStorage.getItem("coinList")
-    if (cache) {
-      coinList.value = JSON.parse(cache).filter(Boolean)
-    }
-    spotSubscrib(coinList.value)
+let websocket: WebSocket | null = new WebSocket(bgWsHost)
+websocket.onopen = function () {
+  setInterval(() => {
+    websocket?.send("ping")
+  }, 30 * 1000)
+  spotSubscrib(coinList.value)
+}
+websocket.onmessage = function (e: MessageEvent<any>) {
+  if ('pong' === e.data) {
+    return
   }
-  // 接收
-  websocket.onmessage = function (e: MessageEvent<any>) {
-    // console.log(e.data)
-    if ('pong' === e.data) {
-      console.log("pong")
-      return
-    }
-    const message: ApiResponse = JSON.parse(e.data)
-    if ("error" === message.event) {
-      console.log("请求失败", message)
-      return
-    }
-    if (message.data) {
-      const data: TickerData = message.data[0]
-      // console.log(`${data.instId} ${data.last} ${data.chgUTC * 100}%`)
-      coinListMap.value?.set(data.instId, data)
-    }
+  const message: ApiResponse = JSON.parse(e.data)
+  if ("error" === message.event) {
+    console.error("response error", message)
+    return
   }
-  // 连接发生错误
-  websocket.onerror = function () {
-    console.log("webSocket连接发生错误")
+  if ("subscribe" === message.event) {
+    console.log("subscribe success", message.arg.instId)
+    return
   }
-  websocket.onclose = function (e) {
-    console.log("webSocket连接关闭")
+  if ("unsubscribe" === message.event) {
+    console.log("unsubscribe success", message.arg.instId)
+    return
+  }
+  if (message.data && Array.isArray(message.data) && message.data.length > 0) {
+    const data: TickerData = message.data[0]
+    coinListMap.value?.set(data.instId, data)
   }
 }
-
-function updateCache() {
-  localStorage.removeItem("coinList")
-  localStorage.setItem("coinList", JSON.stringify(coinList.value))
+websocket.onerror = function () {
+  console.error("websocket error")
+}
+websocket.onclose = function (e) {
+  console.error("websocket closed")
 }
 
 function add() {
@@ -263,7 +195,7 @@ function add() {
   coinList.value.push(selectedPair.value)
   coinListMap.value?.set(selectedPair.value, null)
   selectedPair.value = ""
-  updateCache()
+  localStorage.setItem("coinList", JSON.stringify(coinList.value))
   spotSubscrib(coinList.value)
 }
 
@@ -274,7 +206,7 @@ function remove(coin: string) {
   coin = coin.toUpperCase()
   coinList.value = coinList.value.filter(c => c.toUpperCase() !== coin)
   coinListMap.value.delete(coin)
-  updateCache()
+  localStorage.setItem("coinList", JSON.stringify(coinList.value))
   spotUnsubscrib([coin])
 }
 
@@ -288,7 +220,7 @@ function setSort() {
       onEnd: (e: any) => {
         const targetRow = coinList.value.splice(e.oldIndex, 1)[0]
         coinList.value.splice(e.newIndex, 0, targetRow)
-        updateCache()
+        localStorage.setItem("coinList", JSON.stringify(coinList.value))
       },
     })
   } else {
@@ -296,26 +228,14 @@ function setSort() {
   }
 }
 
+function openLink(symbol: string) {
+  if (!symbol) {
+    return
+  }
+  shell.openExternal(`https://www.bitget.com/zh-CN/spot/${symbol}?type=spot`)
+}
+
 onMounted(async () => {
-  const cachedAlwaysOnTop = localStorage.getItem("alwaysOnTop")
-  if (cachedAlwaysOnTop) {
-    alwaysOnTop.value = cachedAlwaysOnTop === "true" ? true : false
-  }
-  // 初始化代理
-  const cachedProxyEnable = localStorage.getItem("proxyEnable")
-  if (cachedProxyEnable) {
-    proxyEnable.value = cachedProxyEnable === "true" ? true : false
-  }
-  const cachedProxySetting = localStorage.getItem("proxySetting")
-  if (cachedProxySetting) {
-    proxySetting.value = cachedProxySetting
-  }
-  if (proxySetting.value && proxyEnable.value) {
-    await setProxy()
-  }
-  if (proxyStatusOk) {
-    // await requestBatch();
-  }
   // 拖动
   setSort()
 });
@@ -323,7 +243,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div style="width: 900px; user-select: none;">
+  <div style="width: 700px; user-select: none;">
     <div class="top-item">
       <el-checkbox v-model="alwaysOnTop">窗口置顶</el-checkbox>
       &nbsp;&nbsp;
@@ -331,22 +251,22 @@ onMounted(async () => {
       <span v-if="proxyEnable">&nbsp;&nbsp;</span>
       <el-input v-if="proxyEnable" v-model="proxySetting" size="small" style="width: 120px;height: 24px;"></el-input>
       <span v-if="buttonShowFlag && !!proxySetting">&nbsp;&nbsp;</span>
-      <el-button v-if="buttonShowFlag && !!proxySetting" @click="applyProxy" style="height: 24px;">测试&应用代理</el-button>
+      <el-button v-if="buttonShowFlag && !!proxySetting" @click="applyProxy" style="height: 24px;">应用</el-button>
       &nbsp;&nbsp;
-      <el-select v-model.trim="selectedPair" placeholder="请选择" size="small" style="width: 120px" clearable filterable>
+      <el-select v-model.trim="selectedPair" placeholder="请选择" size="small" no-data-text="暂无数据" no-match-text="暂无数据"
+        style="width: 120px" clearable filterable>
         <el-option v-for="pair in allPairs.filter(p => !coinList.includes(p.symbol))" :key="pair.symbol"
           :label="pair.symbol" :value="pair.symbol" style="user-select: none;" />
       </el-select>
       &nbsp;&nbsp;
       <el-button @click="add" size="small" :disabled="!selectedPair">添加</el-button>
       &nbsp;&nbsp;
-      <el-text style="color: gray;user-select: none;">注：bitget 数据</el-text>
+      <el-text style="color: gray;">数据来自 bitget</el-text>
     </div>
-    <el-table v-if="allPairMap.size > 0" id="dragTable" :data="coinList" :row-key="item => item"
-      height="calc(100vh - 65px)" fit>
+    <el-table id="dragTable" :data="coinList" :row-key="item => item" empty-text="暂无数据" height="calc(100vh - 65px)" fit>
       <el-table-column label="名称">
         <template #default="scope">
-          <span class="basecoin">{{
+          <span class="basecoin" v-show="allPairMap.get(scope.row)">{{
             `${allPairMap.get(scope.row)?.baseCoin}_${allPairMap.get(scope.row)?.quoteCoin}`
           }}</span>
         </template>
@@ -366,12 +286,24 @@ onMounted(async () => {
       </el-table-column>
       <el-table-column label="操作">
         <template #default="scope">
-          <el-button size="small" class="handleDrag">
+          <el-button size="small" class="handleDrag" title="移动">
             <el-icon>
               <Sort />
-            </el-icon></el-button>
+            </el-icon>
+          </el-button>
+          <el-button size="small" @click="openLink(scope.row)" title="浏览器打开">
+            <el-icon>
+              <Link />
+            </el-icon>
+          </el-button>
           <el-popconfirm title="确定删除？" confirmButtonText="确定" cancelButtonText="取消" @confirm="remove(scope.row)">
-            <template #reference><el-button size="small">删除</el-button></template>
+            <template #reference>
+              <el-button size="small" title="删除">
+                <el-icon>
+                  <Delete />
+                </el-icon>
+              </el-button>
+            </template>
           </el-popconfirm>
         </template>
       </el-table-column>

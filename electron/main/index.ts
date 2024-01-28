@@ -130,6 +130,5 @@ ipcMain.on("set-proxy", function (event, { proxy, enable }) {
 })
 
 ipcMain.on("set-always-top", function (event, alwaysOnTop: boolean) {
-  console.log("alwaysOnTop", alwaysOnTop)
   win?.setAlwaysOnTop(alwaysOnTop)
 })
