@@ -278,7 +278,7 @@ function throttle(func: Function, wait: number | undefined) {
 function onWindowResize() {
   windowWith.value = window.innerWidth
 }
-const throttledResize = throttle(onWindowResize, 30)
+const throttledResize = throttle(onWindowResize, 20)
 window.addEventListener("resize", throttledResize)
 
 function colorFunc(row: string) {
@@ -315,39 +315,37 @@ function priceTitleFunc(row: string | undefined) {
     return
   }
   let title = ""
-  title = windowWith.value < 450 ? `变化：${(Number(coinListMap.value.get(row)?.chgUTC) * 100).toFixed(2)} %` : ""
-  title = (windowWith.value < 250 ? `名称：${allPairMap.value.get(row)?.baseCoin}\r\n` : "") + title
+  title = windowWith.value < 350 ? `变化：${(Number(coinListMap.value.get(row)?.chgUTC) * 100).toFixed(2)} %` : ""
+  title = (windowWith.value < 210 ? `名称：${allPairMap.value.get(row)?.baseCoin}\r\n` : "") + title
   return title
 }
 
 </script>
 
 <template>
-  <div style="min-width: 210px;user-select: none;">
+  <div style="min-width: 180px;user-select: none;">
     <div class="top-item" v-if="windowWith >= 700">
       <el-checkbox v-model="devtoolsStatus">devtools</el-checkbox>
       &nbsp;&nbsp;
-      <el-checkbox v-model="alwaysOnTop">窗口置顶</el-checkbox>
+      <el-checkbox v-model="alwaysOnTop">置顶</el-checkbox>
       &nbsp;&nbsp;
-      <el-checkbox v-model="proxyEnable">开启代理</el-checkbox>
+      <el-checkbox v-model="proxyEnable">代理</el-checkbox>
       <span v-if="proxyEnable">&nbsp;&nbsp;</span>
-      <el-input v-if="proxyEnable" v-model="proxySetting" size="small" style="width: 120px;height: 24px;"></el-input>
+      <el-input v-if="proxyEnable" v-model="proxySetting" size="small" style="width: 110px;height: 24px;"></el-input>
       <span v-if="buttonShowFlag && !!proxySetting">&nbsp;&nbsp;</span>
       <el-button v-if="buttonShowFlag && !!proxySetting" @click="applyProxy" style="height: 24px;">应用</el-button>
       &nbsp;&nbsp;
       <el-select v-model.trim="selectedPair" placeholder="请选择" size="small" no-data-text="暂无数据" no-match-text="暂无数据"
-        style="width: 120px" clearable filterable>
+        style="width: 100px" clearable filterable>
         <el-option v-for="pair in allPairs.filter(p => !coinList.includes(p.symbol))" :key="pair.symbol"
           :label="pair.symbol" :value="pair.symbol" style="user-select: none;" />
       </el-select>
       &nbsp;&nbsp;
       <el-button @click="add" size="small" :disabled="!selectedPair">添加</el-button>
-      &nbsp;&nbsp;
-      <el-text style="color: gray;">数据来自 bitget</el-text>
     </div>
     <el-table id="dragTable" style="font-weight: bold;" :data="coinList" :row-key="item => item" empty-text="暂无数据"
       :show-header="false" fit>
-      <el-table-column label="名称" :show-overflow-tooltip="true" v-if="windowWith >= 250">
+      <el-table-column label="名称" :show-overflow-tooltip="true" v-if="windowWith >= 210">
         <template #default="scope">
           <span class="basecoin" v-show="allPairMap.get(scope.row)" :title="void (0)" :style="void (0)">
             <span>{{ allPairMap.get(scope.row)?.baseCoin }}</span>
@@ -357,13 +355,13 @@ function priceTitleFunc(row: string | undefined) {
       </el-table-column>
       <el-table-column label="价格" :show-overflow-tooltip="true">
         <template #default="scope">
-          <span :style="{ color: windowWith < 450 ? colorFunc(scope.row) : 'inherit' }"
+          <span :style="{ color: windowWith < 350 ? colorFunc(scope.row) : 'inherit' }"
             :title="priceTitleFunc(scope.row)">
             {{ priceFunc(coinListMap.get(scope.row)?.last) }}
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="变化" v-if="windowWith >= 450">
+      <el-table-column label="变化" v-if="windowWith >= 350">
         <template #default="scope">
           <span v-show="coinListMap.get(scope.row)" :style="{ color: colorFunc(scope.row) }">
             {{ (Number(coinListMap.get(scope.row)?.chgUTC) * 100).toFixed(2) }} %
