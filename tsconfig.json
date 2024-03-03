@@ -9,13 +9,31 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "esModuleInterop": true,
-    "lib": ["ESNext", "DOM"],
+    "lib": [
+      "ESNext",
+      "DOM"
+    ],
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["element-plus/global"]
+    "types": [
+      "node",
+      "element-plus/global"
+    ],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "#/*": [
+        "./types/*"
+      ]
+    }
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
-    { "path": "./tsconfig.node.json" }
+    {
+      "path": "./tsconfig.node.json"
+    }
   ]
 }

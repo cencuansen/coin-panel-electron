@@ -1,3 +1,4 @@
+import { resolve } from 'path'
 import { rmSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
@@ -15,7 +16,7 @@ export default defineConfig(({ command }) => {
   const isServe = command === 'serve'
   const isBuild = command === 'build'
   const sourcemap = isServe || !!process.env.VSCODE_DEBUG
-
+  const pathResolve = (path: string): string => resolve(process.cwd(), path)
   return {
     plugins: [
       vue(),
@@ -78,5 +79,11 @@ export default defineConfig(({ command }) => {
       }
     })(),
     clearScreen: false,
+    resolve: {
+      alias: {
+        '@': pathResolve('src'), // 设置 `@` 指向 `src` 目录
+        '#': pathResolve('types'), // 设置 `#` 指向 `types` 目录
+      }
+    }
   }
 })

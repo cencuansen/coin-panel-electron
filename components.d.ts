@@ -15,10 +15,13 @@ declare module '@vue/runtime-core' {
     ElInput: typeof import('element-plus/es')['ElInput']
     ElOption: typeof import('element-plus/es')['ElOption']
     ElPopconfirm: typeof import('element-plus/es')['ElPopconfirm']
+    ElRow: typeof import('element-plus/es')['ElRow']
     ElSelect: typeof import('element-plus/es')['ElSelect']
     ElTable: typeof import('element-plus/es')['ElTable']
     ElTableColumn: typeof import('element-plus/es')['ElTableColumn']
-    ElText: typeof import('element-plus/es')['ElText']
+    Favorites: typeof import('./src/components/Favorites.vue')['default']
+    Lists: typeof import('./src/components/Lists.vue')['default']
+    Settings: typeof import('./src/components/Settings.vue')['default']
     TopRank: typeof import('./src/components/TopRank.vue')['default']
   }
 }
