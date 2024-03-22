@@ -349,6 +349,15 @@ function priceChange(symbol: string) {
     return Number(((Number(coinListMap.value.get(symbol)?.last) - (Number(coinOpenMap.value.get(symbol)))) / (Number(coinOpenMap.value.get(symbol))) * 100).toFixed(5))
 }
 
+let today = new Date()
+setInterval(async () => {
+    if ((new Date().getDay()) !== today.getDay()) {
+        today = new Date()
+        // 换天，更新开盘价
+        await getOpenPrice(coinList.value)
+    }
+}, 3 * 1000)
+
 </script>
 
 <template>
