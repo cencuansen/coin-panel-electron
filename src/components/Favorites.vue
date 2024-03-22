@@ -134,19 +134,18 @@ async function getOpenPrice(symbols: string[]) {
     let startTime = new Date()
     startTime.setHours(0, 1, 0, 0) // 设置时间为0点1分
     let timestamp = startTime.getTime() // 获取时间戳
-    let index = 0
-    let timer = setInterval(async () => {
-        // curl "https://api.bitget.com/api/v2/spot/market/history-candles?symbol=BTCUSDT&granularity=1min&endTime=1659080270000&limit=100"
-        const response = await axios.get(`${bgHttpHost}${bgApis.historyCandles}?symbol=${symbols[index]}&granularity=1min&endTime=${timestamp}&limit=1`)
-        const candles: HistoryCandlesResponse = response.data
-        let candleData = candles.data as number[][]
-        coinOpenMap.value.set(symbols[index], candleData[0][1])
-        // console.log(symbols[index], candleData[0][1])
-        index++
-        if (index >= symbols.length) {
-            clearInterval(timer)
-        }
-    }, 100)
+
+    for (var i = 0; i < symbols.length; i++) {
+        (function clo(index) {
+            setTimeout(async function () {
+                const response = await axios.get(`${bgHttpHost}${bgApis.historyCandles}?symbol=${symbols[index]}&granularity=1min&endTime=${timestamp}&limit=1`)
+                const candles: HistoryCandlesResponse = response.data
+                let candleData = candles.data as number[][]
+                coinOpenMap.value.set(symbols[index], candleData[0][1])
+                // console.log(symbols[index])
+            }, 100 * index)
+        })(i)
+    }
 }
 
 let websocket: WebSocket | null
@@ -319,7 +318,7 @@ function colorFunc(row: string) {
     return priceChange(row) < 0 ? 'red' : 'green'
 }
 
-function priceFunc(price: number | undefined) {
+function priceFunc(price: number | string | undefined) {
     if (!price) {
         return ""
     }

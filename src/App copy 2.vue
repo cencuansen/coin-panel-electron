@@ -293,7 +293,7 @@ function colorFunc(row: string) {
   return num < 0 ? 'red' : 'green'
 }
 
-function priceFunc(price: string | undefined) {
+function priceFunc(price: number | string | undefined) {
   if (!price) {
     return ""
   }
@@ -302,7 +302,7 @@ function priceFunc(price: string | undefined) {
     return ""
   }
   if (num * 1000 < 1) {
-    let fractional = price.split(".")[1]
+    let fractional = ("" + price).split(".")[1]
     let nonZeroIndex: number = fractional.split("").findIndex(c => Number(c) > 0)
     let nonZeroPart = fractional.substring(nonZeroIndex, Math.min(nonZeroIndex + 3, fractional.length))
     return `0.0{${nonZeroIndex}}${nonZeroPart}`
