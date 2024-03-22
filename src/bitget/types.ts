@@ -1,6 +1,6 @@
 export interface TickerData {
     instId: string
-    last: string
+    last: number
     open24h: string
     high24h: string
     low24h: string
@@ -14,6 +14,7 @@ export interface TickerData {
     chgUTC: string
     bidSz: string
     askSz: string
+    openUtc8: string
 }
 
 export interface SnapshotResponse {
@@ -60,4 +61,11 @@ export interface TradingPairsResponse {
     msg: string
     requestTime: number
     data: TradingPair[]
+}
+
+export interface HistoryCandlesResponse {
+    code: string
+    msg: string
+    requestTime: number
+    data: (number[])[]
 }

@@ -5,7 +5,7 @@ import { shell } from "electron"
 import { onMounted, ref, watch } from "vue"
 import { ipcRenderer } from "electron"
 import { bgHttpHost, bgWsHost, bgApis } from "@/bitget/apis"
-import { TickerData, SnapshotResponse, SubscribeResponse, ApiResponse, TradingPair, TradingPairsResponse } from "@/bitget/types"
+import { TickerData, SnapshotResponse, SubscribeResponse, ApiResponse, TradingPair, TradingPairsResponse, HistoryCandlesResponse } from "@/bitget/types"
 
 const devtoolsStatus = ref<boolean>(false)
 const alwaysOnTop = ref<boolean>(false)
@@ -19,6 +19,7 @@ const selectedPair = ref<string>("")
 const coinList = ref<string[]>(["BTCUSDT"])
 const allPairMap = ref<Map<string, TradingPair>>(new Map<string, TradingPair>())
 const coinListMap = ref<Map<string, TickerData | null>>(new Map<string, TickerData>)
+const coinOpenMap = ref<Map<string, number>>(new Map<string, number>)
 
 watch(devtoolsStatus, (newVal) => {
     ipcRenderer.send("toggle-devtools", newVal)
@@ -125,9 +126,32 @@ async function getAllPair() {
     })
 }
 
+async function getOpenPrice(symbols: string[]) {
+    symbols = symbols.filter(Boolean)
+    if (symbols.length === 0) {
+        return
+    }
+    let startTime = new Date()
+    startTime.setHours(0, 1, 0, 0) // 设置时间为0点1分
+    let timestamp = startTime.getTime() // 获取时间戳
+    let index = 0
+    let timer = setInterval(async () => {
+        // curl "https://api.bitget.com/api/v2/spot/market/history-candles?symbol=BTCUSDT&granularity=1min&endTime=1659080270000&limit=100"
+        const response = await axios.get(`${bgHttpHost}${bgApis.historyCandles}?symbol=${symbols[index]}&granularity=1min&endTime=${timestamp}&limit=1`)
+        const candles: HistoryCandlesResponse = response.data
+        let candleData = candles.data as number[][]
+        coinOpenMap.value.set(symbols[index], candleData[0][1])
+        // console.log(symbols[index], candleData[0][1])
+        index++
+        if (index >= symbols.length) {
+            clearInterval(timer)
+        }
+    }, 100)
+}
+
 let websocket: WebSocket | null
 
-function spotSubscrib(tickers: string[]) {
+async function spotSubscrib(tickers: string[]) {
     if (!tickers) { return }
     let sub = {
         "op": "subscribe",
@@ -140,6 +164,7 @@ function spotSubscrib(tickers: string[]) {
         })
     }
     websocket?.send(JSON.stringify(sub))
+    await getOpenPrice(tickers)
 }
 
 function spotUnsubscrib(tickers: string[]) {
@@ -282,18 +307,19 @@ const throttledResize = throttle(onWindowResize, 20)
 window.addEventListener("resize", throttledResize)
 
 function colorFunc(row: string) {
-    let item: TickerData | null | undefined = coinListMap.value.get(row)
-    if (!item) {
-        return ""
-    }
-    let num = Number(item.chgUTC)
-    if (isNaN(num)) {
-        return ""
-    }
-    return num < 0 ? 'red' : 'green'
+    // let item: TickerData | null | undefined = coinListMap.value.get(row)
+    // if (!item) {
+    //     return ""
+    // }
+    // let num = Number(item.chgUTC)
+    // if (isNaN(num)) {
+    //     return ""
+    // }
+    // return num < 0 ? 'red' : 'green'
+    return priceChange(row) < 0 ? 'red' : 'green'
 }
 
-function priceFunc(price: string | undefined) {
+function priceFunc(price: number | undefined) {
     if (!price) {
         return ""
     }
@@ -302,12 +328,12 @@ function priceFunc(price: string | undefined) {
         return ""
     }
     if (num * 1000 < 1) {
-        let fractional = price.split(".")[1]
+        let fractional = ("" + price).split(".")[1]
         let nonZeroIndex: number = fractional.split("").findIndex(c => Number(c) > 0)
         let nonZeroPart = fractional.substring(nonZeroIndex, Math.min(nonZeroIndex + 3, fractional.length))
         return `0.0{${nonZeroIndex}}${nonZeroPart}`
     }
-    return Number(num.toFixed(3))
+    return Number(num.toFixed(5))
 }
 
 function priceTitleFunc(row: string | undefined) {
@@ -318,6 +344,10 @@ function priceTitleFunc(row: string | undefined) {
     title = windowWith.value < 350 ? `变化：${(Number(coinListMap.value.get(row)?.chgUTC) * 100).toFixed(2)} %` : ""
     title = (windowWith.value < 210 ? `名称：${allPairMap.value.get(row)?.baseCoin}\r\n` : "") + title
     return title
+}
+
+function priceChange(symbol: string) {
+    return Number(((Number(coinListMap.value.get(symbol)?.last) - (Number(coinOpenMap.value.get(symbol)))) / (Number(coinOpenMap.value.get(symbol))) * 100).toFixed(5))
 }
 
 </script>
@@ -354,7 +384,7 @@ function priceTitleFunc(row: string | undefined) {
             <el-table-column label="变化" v-if="windowWith >= 350">
                 <template #default="scope">
                     <span v-show="coinListMap.get(scope.row)" :style="{ color: colorFunc(scope.row) }">
-                        {{ (Number(coinListMap.get(scope.row)?.chgUTC) * 100).toFixed(2) }} %
+                        {{ priceChange(scope.row) }} %
                     </span>
                 </template>
             </el-table-column>
