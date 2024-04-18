@@ -20,7 +20,7 @@
     "@types/sortablejs": "^1.15.7",
     "@vitejs/plugin-vue": "^4.1.0",
     "electron": "^24.1.2",
-    "electron-builder": "^23.6.0",
+    "electron-builder": "^24.6.3",
     "sass": "^1.62.0",
     "typescript": "^5.0.2",
     "unplugin-auto-import": "^0.15.3",
