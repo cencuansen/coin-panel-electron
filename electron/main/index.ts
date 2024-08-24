@@ -54,6 +54,10 @@ async function createWindow() {
   })
 
   win.on('close', (e) => {
+    // win.destroy()
+    // win = null
+    // app.quit()
+
     e.preventDefault()
     win.hide()
     win.setSkipTaskbar(true)
