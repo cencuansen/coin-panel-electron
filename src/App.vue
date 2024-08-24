@@ -10,8 +10,8 @@ const components = ref<{ [key: string]: DefineComponent<any, any, any> }>({
   "settings": Settings,
 })
 
-const currentComponent = ref<DefineComponent<any, any, any>>(Favorites)
 const currentComponentName = ref<string>("favorites")
+const currentComponent = ref<DefineComponent<any, any, any>>(Favorites)
 
 function switchComponent(name: string) {
   currentComponentName.value = name
