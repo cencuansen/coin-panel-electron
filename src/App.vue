@@ -54,21 +54,21 @@ const buttonType = (name: string) => currentComponentName.value === name ? 'prim
 
 <style lang="scss" scoped>
 .main-body {
-  height: 97vh;
+  height: 99vh;
   position: relative;
   user-select: none;
   min-width: 180px;
 }
 
 .middle-item-group {
-  height: calc(100% - 35px);
+  height: calc(100% - 30px);
 }
 
 .buttom-item-group {
   position: absolute;
   bottom: 0;
   left: 0;
-  height: 35px;
+  height: 30px;
   width: 100%;
 }
 </style>

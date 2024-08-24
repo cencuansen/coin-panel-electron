@@ -56,6 +56,26 @@ export interface TradingPair {
     sellLimitPriceRatio: string
 }
 
+export interface Ticker {
+    symbol: string
+    high24h: number
+    open: number
+    low24h: number
+    lastPr: number
+    quoteVolume: number
+    baseVolume: number
+    usdtVolume: number
+    bidPr: number
+    askPr: number
+    bidSz: number
+    askSz: number
+    openUtc: number
+    ts: number
+    changeUtc24h: number
+    change24h: number
+    [key: string]: any
+}
+
 export interface TradingPairsResponse {
     code: string
     msg: string
@@ -68,4 +88,11 @@ export interface HistoryCandlesResponse {
     msg: string
     requestTime: number
     data: (number[])[]
+}
+
+export interface TickerResponse {
+    code: string
+    msg: string
+    requestTime: number
+    data: Ticker[]
 }

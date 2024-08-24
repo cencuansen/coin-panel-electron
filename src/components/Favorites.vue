@@ -1,10 +1,9 @@
 <script setup lang="ts">
 
 import Sortable from "sortablejs"
-import { shell } from "electron"
 import { onMounted, ref, watch } from "vue"
-import { ipcRenderer } from "electron"
-import { bgWsHost, openPriceFun, allPairsFun } from "@/bitget/apis"
+import { numberFormat } from "@/utils/number"
+import { bgWsHost, openLink, openPriceFun, allPairsFun } from "@/bitget/apis"
 import { TickerData, SnapshotResponse, SubscribeResponse, ApiResponse, TradingPair, TradingPairsResponse, HistoryCandlesResponse } from "@/bitget/types"
 
 const selectedPair = ref<string>("")
@@ -156,13 +155,6 @@ function dragSort() {
     }
 }
 
-function openLink(symbol: string) {
-    if (!symbol) {
-        return
-    }
-    shell.openExternal(`https://www.bitget.com/zh-CN/spot/${symbol}?type=spot`)
-}
-
 onMounted(async () => {
     dragSort()
     getAllPairs()
@@ -189,23 +181,6 @@ window.addEventListener("resize", throttledResize)
 
 function colorFunc(row: string) {
     return priceChange(row) < 0 ? 'red' : 'green'
-}
-
-function priceFunc(price: number | string | undefined) {
-    if (!price) {
-        return ""
-    }
-    let num = Number(price)
-    if (isNaN(num)) {
-        return ""
-    }
-    if (num * 1000 < 1) {
-        let fractional = ("" + price).split(".")[1]
-        let nonZeroIndex: number = fractional.split("").findIndex(c => Number(c) > 0)
-        let nonZeroPart = fractional.substring(nonZeroIndex, Math.min(nonZeroIndex + 3, fractional.length))
-        return `0.0{${nonZeroIndex}}${nonZeroPart}`
-    }
-    return Number(num.toFixed(5))
 }
 
 function priceTitleFunc(row: string | undefined) {
@@ -258,7 +233,7 @@ setInterval(async () => {
                 <template #default="scope">
                     <span :style="{ color: windowWith < 350 ? colorFunc(scope.row) : 'inherit' }"
                         :title="priceTitleFunc(scope.row)">
-                        {{ priceFunc(coinListMap.get(scope.row)?.last) }}
+                        {{ numberFormat(coinListMap.get(scope.row)?.last) }}
                     </span>
                 </template>
             </el-table-column>

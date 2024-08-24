@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { priceFormat, percentageFormat } from "../utils/format"
+import { numberFormat, percentageFormat } from "../utils/format"
 
 defineProps({
   color: {
@@ -18,7 +18,7 @@ const colorType = (value: number) => value >= 0 ? 'success' : 'danger';
   <el-text :type="color">{{ title }}</el-text>
   <el-table :data="data">
     <el-table-column prop="symbol" label="名称" width="150" show-overflow-tooltip />
-    <el-table-column prop="lastPrice" label="价格" width="100" show-overflow-tooltip :formatter="priceFormat" />
+    <el-table-column prop="lastPrice" label="价格" width="100" show-overflow-tooltip :formatter="numberFormat" />
     <el-table-column label="24小时" width="100" show-overflow-tooltip>
       <template #default="scope">
         <el-text :type="colorType(scope.row.priceChangePercent)">{{ scope.row.priceChangePercent }}%</el-text>

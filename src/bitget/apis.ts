@@ -1,7 +1,12 @@
 import axios1 from 'axios'
+import { shell } from "electron"
+import { numberFormat } from '../utils/number/index'
+import { TickerData, SnapshotResponse, SubscribeResponse, ApiResponse, TradingPair, Ticker, TradingPairsResponse, HistoryCandlesResponse, TickerResponse } from "./types"
+
 export const bgHttpHost = "https://api.bitget.com"
 export const bgWsHost = "wss://ws.bitgetapi.com/spot/v1/stream"
-import { TickerData, SnapshotResponse, SubscribeResponse, ApiResponse, TradingPair, TradingPairsResponse, HistoryCandlesResponse } from "./types"
+
+const bgHost = "https://www.bitget.com"
 
 const axios = axios1.create({
     baseURL: bgHttpHost
@@ -9,7 +14,15 @@ const axios = axios1.create({
 
 export const bgApis = {
     allPairs: "/api/v2/spot/public/symbols",
-    historyCandles: "/api/v2/spot/market/history-candles"
+    historyCandles: "/api/v2/spot/market/history-candles",
+    tickers: "/api/v2/spot/market/tickers"
+}
+
+export function openLink(symbol: string) {
+    if (!symbol) {
+        return
+    }
+    shell.openExternal(`${bgHost}/zh-CN/spot/${symbol}?type=spot`)
 }
 
 export async function allPairsFun(): Promise<TradingPair[]> {
@@ -37,4 +50,16 @@ export async function openPriceFun(symbols: string[], callback: Function) {
             }, 250 * index)
         })(i)
     }
+}
+
+export async function allTickersFun(): Promise<Ticker[]> {
+    const response = await axios.get(bgApis.tickers)
+    const result: TickerResponse = response.data
+    const tickers: Ticker[] = result.data
+    for (let i = 0; i < tickers.length; i++) {
+        tickers[i].change24h = tickers[i].change24h * 100
+        tickers[i].changeUtc24h = tickers[i].changeUtc24h * 100
+    }
+    tickers.sort((a, b) => a.symbol.localeCompare(b.symbol))
+    return tickers
 }

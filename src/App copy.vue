@@ -1,87 +1,87 @@
 <script setup lang="ts">
-import {ElNotification, TableColumnCtx} from "element-plus";
+import { ElNotification, TableColumnCtx } from "element-plus"
 import TopRank from "./components/TopRank.vue"
-import {latest24h, windows, latest} from "./apis/binance-api";
-import {wsUrl, wsUrl2} from "./apis/binance-ws-api";
-import {SymbolChange, TickerPrice} from "./types"
-import {ref, computed, onMounted, watch} from "vue";
-import axios from "axios";
-import {paddingZero} from "./utils/number";
-import {priceFormat} from "./utils/format";
-import {ipcRenderer} from "electron";
+import { latest24h, windows, latest } from "./apis/binance-api"
+import { wsUrl, wsUrl2 } from "./apis/binance-ws-api"
+import { SymbolChange, TickerPrice } from "./types"
+import { ref, computed, onMounted, watch } from "vue"
+import axios from "axios"
+import { paddingZero } from "./utils/number"
+import { numberFormat } from "./utils/format"
+import { ipcRenderer } from "electron"
 
-const latestUpdateTime = ref<number>(0);
-const hour24UpdateTime = ref<number>(0);
-const now = ref<number>(0);
-const requestInterval = ref<boolean>(false);
-const proxySetting = ref<string>("127.0.0.1:10800");
-const proxyEnable = ref<boolean>(true);
-const proxyStatusOk = ref<boolean>(false);
-const buttonShowFlag = ref<boolean>(false);
-const proxyCheckServer = "https://www.google.com";
-let intervalTimer: NodeJS.Timer;
-const timerSeconds = ref<number>(30); // 轮询时间间隔，秒
-const latestPrice = ref<TickerPrice[]>([]);
-const change24Hours = ref<SymbolChange[]>([]);
-const change24HoursTop10 = computed(() => change24Hours.value.slice(0, 20));
-const change24HoursTail10 = computed(() => change24Hours.value.slice(change24Hours.value.length - 20).reverse());
+const latestUpdateTime = ref<number>(0)
+const hour24UpdateTime = ref<number>(0)
+const now = ref<number>(0)
+const requestInterval = ref<boolean>(false)
+const proxySetting = ref<string>("127.0.0.1:10800")
+const proxyEnable = ref<boolean>(true)
+const proxyStatusOk = ref<boolean>(false)
+const buttonShowFlag = ref<boolean>(false)
+const proxyCheckServer = "https://www.google.com"
+let intervalTimer: NodeJS.Timer
+const timerSeconds = ref<number>(30) // 轮询时间间隔，秒
+const latestPrice = ref<TickerPrice[]>([])
+const change24Hours = ref<SymbolChange[]>([])
+const change24HoursTop10 = computed(() => change24Hours.value.slice(0, 20))
+const change24HoursTail10 = computed(() => change24Hours.value.slice(change24Hours.value.length - 20).reverse())
 
-const timeFormat = (time: Date) => `${paddingZero(time.getHours())}:${paddingZero(time.getMinutes())}:${paddingZero(time.getSeconds())}`;
+const timeFormat = (time: Date) => `${paddingZero(time.getHours())}:${paddingZero(time.getMinutes())}:${paddingZero(time.getSeconds())}`
 
 let latestUpdateTimeFormat = computed(() => {
-  return timeFormat(new Date(latestUpdateTime.value));
-});
+  return timeFormat(new Date(latestUpdateTime.value))
+})
 
 let hour24UpdateTimeFormat = computed(() => {
-  return timeFormat(new Date(hour24UpdateTime.value));
-});
+  return timeFormat(new Date(hour24UpdateTime.value))
+})
 
 let nowTime = computed(() => {
-  return timeFormat(new Date(now.value));
-});
+  return timeFormat(new Date(now.value))
+})
 
 async function getLatest24h() {
-  change24Hours.value = await latest24h();
-  hour24UpdateTime.value = Date.now();
+  change24Hours.value = await latest24h()
+  hour24UpdateTime.value = Date.now()
 }
 
 async function getLatest() {
-  latestPrice.value = await latest();
-  latestUpdateTime.value = Date.now();
+  latestPrice.value = await latest()
+  latestUpdateTime.value = Date.now()
 }
 
 setInterval(async () => {
-  now.value = Date.now();
-}, 15);
+  now.value = Date.now()
+}, 15)
 
 onMounted(async () => {
   // 初始化代理
   if (proxySetting.value && proxyEnable.value) {
-    await setProxy();
+    await setProxy()
   }
   if (proxyStatusOk) {
     // await requestBatch();
   }
-});
+})
 
 const wsConnect = (url: string) => {
-  let websocket = new WebSocket(url);
+  let websocket = new WebSocket(url)
   websocket.onopen = function () {
-    console.log("连接成功");
-  };
+    console.log("连接成功")
+  }
   // 接收
   websocket.onmessage = function (e: MessageEvent<any>) {
     // 解析JSON格式的数据
     // const data = JSON.parse(e.data);
-    console.log(e.data);
-  };
+    console.log(e.data)
+  }
   // 连接发生错误
   websocket.onerror = function () {
-    console.log("webSocket连接发生错误");
-  };
+    console.log("webSocket连接发生错误")
+  }
   websocket.onclose = function (e) {
-    console.log("webSocket连接关闭");
-  };
+    console.log("webSocket连接关闭")
+  }
 }
 
 // 开启代理
@@ -89,11 +89,11 @@ async function setProxy() {
   ipcRenderer.send("set-proxy", {
     proxy: proxySetting.value,
     enable: true,
-  });
-  const status: boolean = await proxyStatusCheck();
+  })
+  const status: boolean = await proxyStatusCheck()
   if (status) {
     // wsConnect(wsUrl("btcusdt@miniTicker"));
-    wsConnect(wsUrl2(["btcusdt@miniTicker", "ethusdt@miniTicker"]));
+    wsConnect(wsUrl2(["btcusdt@miniTicker", "ethusdt@miniTicker"]))
   }
 }
 
@@ -102,62 +102,62 @@ async function closeProxy() {
   ipcRenderer.send("set-proxy", {
     proxy: null,
     enable: false,
-  });
+  })
   if (proxyStatusOk.value) {
     ElNotification({
       title: "代理已关闭！",
       type: "success"
-    });
+    })
   }
-  proxyStatusOk.value = false;
-  buttonShowFlag.value = false;
+  proxyStatusOk.value = false
+  buttonShowFlag.value = false
 }
 
 watch(proxyEnable, async (newVal) => {
   if (newVal && proxySetting.value) {
-    await setProxy();
+    await setProxy()
   } else {
-    await closeProxy();
+    await closeProxy()
   }
-});
+})
 
 watch(proxySetting, async (newVal) => {
-  buttonShowFlag.value = !!newVal;
-});
+  buttonShowFlag.value = !!newVal
+})
 
 async function applyProxy() {
   // 开启或关闭代理
   if (proxyEnable.value && proxySetting.value) {
-    await setProxy();
+    await setProxy()
   } else {
-    await closeProxy();
+    await closeProxy()
   }
 }
 
 async function proxyStatusCheck(): Promise<boolean> {
   try {
-    await axios.head(proxyCheckServer);
+    await axios.head(proxyCheckServer)
     ElNotification({
       title: "代理已开启！",
       type: "success"
-    });
-    proxyStatusOk.value = true;
-    buttonShowFlag.value = false;
-    return true;
+    })
+    proxyStatusOk.value = true
+    buttonShowFlag.value = false
+    return true
   } catch (error) {
     ElNotification({
       title: "代理配置有误，请检查！",
       type: "error"
-    });
+    })
     ipcRenderer.send("set-proxy", {
       proxy: null,
       enable: false,
-    });
+    })
     if (proxyStatusOk.value) {
-      proxyStatusOk.value = false;
+      proxyStatusOk.value = false
     }
-    buttonShowFlag.value = true;
-    return false;
+    buttonShowFlag.value = true
+    return false
   }
 }
 </script>
@@ -199,8 +199,8 @@ async function proxyStatusCheck(): Promise<boolean> {
     <div>
       <el-text>最新价</el-text>
       <el-table :data="latestPrice">
-        <el-table-column prop="symbol" label="名称" width="150" show-overflow-tooltip/>
-        <el-table-column prop="price" label="价格" width="120" show-overflow-tooltip :formatter="priceFormat"/>
+        <el-table-column prop="symbol" label="名称" width="150" show-overflow-tooltip />
+        <el-table-column prop="price" label="价格" width="120" show-overflow-tooltip :formatter="numberFormat" />
       </el-table>
     </div>
   </el-row>
