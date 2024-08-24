@@ -1,151 +1,36 @@
 <script setup lang="ts">
-import axios from 'axios'
+
 import Sortable from "sortablejs"
 import { shell } from "electron"
 import { onMounted, ref, watch } from "vue"
 import { ipcRenderer } from "electron"
-import { bgHttpHost, bgWsHost, bgApis } from "@/bitget/apis"
+import { bgWsHost, openPriceFun, allPairsFun } from "@/bitget/apis"
 import { TickerData, SnapshotResponse, SubscribeResponse, ApiResponse, TradingPair, TradingPairsResponse, HistoryCandlesResponse } from "@/bitget/types"
 
-const devtoolsStatus = ref<boolean>(false)
-const alwaysOnTop = ref<boolean>(false)
-const proxySetting = ref<string>("127.0.0.1:10800")
-const proxyEnable = ref<boolean>(true)
-const proxyStatusOk = ref<boolean>(false)
-const buttonShowFlag = ref<boolean>(false)
-const proxyCheckServer = "https://www.google.com"
-const allPairs = ref<TradingPair[]>([])
 const selectedPair = ref<string>("")
+const allPairs = ref<TradingPair[]>([])
 const coinList = ref<string[]>(["BTCUSDT"])
+const coinOpenMap = ref<Map<string, number>>(new Map<string, number>)
 const allPairMap = ref<Map<string, TradingPair>>(new Map<string, TradingPair>())
 const coinListMap = ref<Map<string, TickerData | null>>(new Map<string, TickerData>)
-const coinOpenMap = ref<Map<string, number>>(new Map<string, number>)
 
-watch(devtoolsStatus, (newVal) => {
-    ipcRenderer.send("toggle-devtools", newVal)
-})
-
-watch(alwaysOnTop, (newVal) => {
-    localStorage.setItem("alwaysOnTop", `${newVal}`)
-    ipcRenderer.send("set-always-top", newVal)
-})
-
-watch(proxyEnable, async (newVal) => {
-    if (newVal && proxySetting.value) {
-        await setProxy()
-    } else {
-        await closeProxy()
-    }
-})
-
-watch(proxySetting, async (newVal) => {
-    buttonShowFlag.value = localStorage.getItem("proxySetting") !== newVal
-})
-
-// 开启代理
-async function setProxy() {
-    ipcRenderer.send("set-proxy", {
-        proxy: proxySetting.value,
-        enable: true,
-    })
-    const status: boolean = await proxyStatusCheck()
-    if (status) {
-        localStorage.setItem("proxyEnable", `true`)
-        localStorage.setItem("proxySetting", proxySetting.value)
-        await getAllPair()
-    }
-}
-
-// 关闭代理
-async function closeProxy() {
-    localStorage.setItem("proxyEnable", `false`)
-    ipcRenderer.send("set-proxy", {
-        proxy: null,
-        enable: false,
-    })
-    proxyStatusOk.value = false
-    buttonShowFlag.value = false
-}
-
-async function applyProxy() {
-    // 开启或关闭代理
-    if (proxyEnable.value && proxySetting.value) {
-        await setProxy()
-    } else {
-        await closeProxy()
-    }
-}
-
-async function proxyStatusCheck(): Promise<boolean> {
-    try {
-        await axios.head(proxyCheckServer)
-        proxyStatusOk.value = true
-        buttonShowFlag.value = false
-        return true
-    } catch (error) {
-        ipcRenderer.send("set-proxy", {
-            proxy: null,
-            enable: false,
-        })
-        proxyStatusOk.value = false
-        buttonShowFlag.value = true
-        return false
-    }
-}
-
-// 加载缓存
 const cache = localStorage.getItem("coinList")
 if (cache) {
     coinList.value = JSON.parse(cache).filter(Boolean)
 }
-// 窗口置顶
-const cachedAlwaysOnTop = localStorage.getItem("alwaysOnTop")
-if (cachedAlwaysOnTop) {
-    alwaysOnTop.value = cachedAlwaysOnTop === "true" ? true : false
-}
-// 初始化代理
-const cachedProxyEnable = localStorage.getItem("proxyEnable")
-if (cachedProxyEnable) {
-    proxyEnable.value = cachedProxyEnable === "true"
-}
-const cachedProxySetting = localStorage.getItem("proxySetting")
-if (cachedProxySetting) {
-    proxySetting.value = cachedProxySetting
-}
-if (proxySetting.value && proxyEnable.value) {
-    setProxy()
-}
 
-async function getAllPair() {
-    const response = await axios.get(`${bgHttpHost}${bgApis.allPairs}`)
-    const pairs: TradingPairsResponse = response.data
-    let allPair = pairs.data as TradingPair[]
-    allPairs.value = allPair.filter(pair => "USDT" === pair.quoteCoin.toUpperCase())
-    allPairs.value.forEach((pair: TradingPair) => {
-        allPairMap.value.set(pair.symbol, pair)
+async function getOpenPrice(symbols: string[]) {
+    await openPriceFun(symbols, (key: string, value: number) => {
+        coinOpenMap.value.set(key, value)
     })
 }
 
-async function getOpenPrice(symbols: string[]) {
-    symbols = symbols.filter(Boolean)
-    if (symbols.length === 0) {
-        return
-    }
-    let startTime = new Date()
-    startTime.setHours(0, 1, 0, 0) // 设置时间为0点1分
-    let timestamp = startTime.getTime() // 获取时间戳
-
-    for (var i = 0; i < symbols.length; i++) {
-        (function clo(index) {
-            setTimeout(async function () {
-                const response = await axios.get(`${bgHttpHost}${bgApis.historyCandles}?symbol=${symbols[index]}&granularity=1min&endTime=${timestamp}&limit=1`)
-                const candles: HistoryCandlesResponse = response.data
-                let candleData = candles.data as number[][]
-                coinOpenMap.value.set(symbols[index], candleData[0][1])
-                // console.log(symbols[index])
-            }, 100 * index)
-        })(i)
-    }
+async function getAllPairs() {
+    const res = await allPairsFun() as TradingPair[]
+    allPairs.value = res
+    allPairs.value.forEach((pair: TradingPair) => {
+        allPairMap.value.set(pair.symbol, pair)
+    })
 }
 
 let websocket: WebSocket | null
@@ -245,9 +130,7 @@ function add() {
 }
 
 function remove(coin: string) {
-    if (!coin) {
-        return
-    }
+    if (!coin) return
     coin = coin.toUpperCase()
     coinList.value = coinList.value.filter(c => c.toUpperCase() !== coin)
     coinListMap.value.delete(coin)
@@ -255,7 +138,7 @@ function remove(coin: string) {
     spotUnsubscrib([coin])
 }
 
-function setSort() {
+function dragSort() {
     const el = document.querySelector("#dragTable table tbody")
     if (el instanceof HTMLElement) {
         new Sortable(el, {
@@ -281,14 +164,13 @@ function openLink(symbol: string) {
 }
 
 onMounted(async () => {
-    // 拖动
-    setSort()
+    dragSort()
+    getAllPairs()
 })
 
 const windowWith = ref<number>(9999)
 
 function throttle(func: Function, wait: number | undefined) {
-    // 节流函数
     let timer: NodeJS.Timeout | null
     return function (this: any) {
         if (!timer) {
@@ -306,15 +188,6 @@ const throttledResize = throttle(onWindowResize, 20)
 window.addEventListener("resize", throttledResize)
 
 function colorFunc(row: string) {
-    // let item: TickerData | null | undefined = coinListMap.value.get(row)
-    // if (!item) {
-    //     return ""
-    // }
-    // let num = Number(item.chgUTC)
-    // if (isNaN(num)) {
-    //     return ""
-    // }
-    // return num < 0 ? 'red' : 'green'
     return priceChange(row) < 0 ? 'red' : 'green'
 }
 
@@ -352,8 +225,8 @@ function priceChange(symbol: string) {
 let today = new Date()
 setInterval(async () => {
     if ((new Date().getDay()) !== today.getDay()) {
-        today = new Date()
         // 换天，更新开盘价
+        today = new Date()
         await getOpenPrice(coinList.value)
     }
 }, 3 * 1000)
