@@ -4,6 +4,8 @@ import { Ticker } from '@/bitget/types'
 import { onMounted, ref, watch, computed, RendererNode, VNode, h } from "vue"
 import { Column, ElText, TableColumnCtx, ElIcon } from "element-plus"
 import { numberFormat } from "@/utils/number"
+import { CellRendererParams, HeaderCellRendererParams } from 'element-plus/es/components/table-v2/src/types'
+import { column } from 'element-plus/es/components/table-v2/src/common'
 
 const search = ref('')
 const sortColumn = ref<string>('symbol')
@@ -45,10 +47,9 @@ function openLinkHandler(column: string) {
     openLink(column)
 }
 
-function headerClick(column: any, e: any) {
-    const property: string = column.dataKey
-    if (sortColumn.value !== property) {
-        sortColumn.value = property
+function headerClick(dataKey: string) {
+    if (sortColumn.value !== dataKey) {
+        sortColumn.value = dataKey
         sortType.value = 'desc'
     } else {
         if (sortType.value === 'desc') {
@@ -103,21 +104,24 @@ function selectChanged(value: string) {
     maxValue.value = null
 }
 
-const columns: Column<Ticker> = columnOptions.map(op => {
+const columns: Column<number | string>[] = columnOptions.map((op): Column<number | string> => {
     return {
         dataKey: op.prop,
         title: op.label,
-        width: op.width,
-        cellRenderer: ({ cellData }: { cellData: string }) =>
-            op.prop === 'symbol'
-                ? h(ElText, { class: 'symbol-col', onClick: () => openLinkHandler(cellData) }, { default: () => h('a', {}, { default: () => cellData }) })
-                : h(ElText, { class: 'number-col', style: ['changeUtc24h', 'change24h'].includes(op.prop) ? { 'color': Number(cellData) >= 0 ? 'green' : 'red' } : {} }, { default: () => numberFormat(cellData) })
-        ,
-        headerCellRenderer: ({ column }: { column: Column<Ticker> }) => {
-            return h(
-                ElText,
-                { onClick: () => headerClick(column, null) },
-                { default: () => [column.title, ' ', column.dataKey === sortColumn.value ? (sortType.value === 'asc' ? '↑' : sortType.value === 'desc' ? '↓' : '') : ''] }
+        width: op.width || 120,
+        cellRenderer: (params: CellRendererParams<number | string>) => {
+            const data: number | string = params.cellData
+            const dataKey: string = String(params.column.dataKey)
+            return dataKey === 'symbol'
+                ? h(ElText, { class: 'symbol-col', onClick: () => openLinkHandler(String(data)) }, { default: () => h('a', {}, { default: () => data }) })
+                : h(ElText, { class: 'number-col', style: ['changeUtc24h', 'change24h'].includes(op.prop) ? { 'color': Number(data) >= 0 ? 'green' : 'red' } : {} }, { default: () => numberFormat(data) })
+        },
+        headerCellRenderer: (params: HeaderCellRendererParams<number | string>) => {
+            const title: string = String(params.column.title)
+            const dataKey: string = String(params.column.dataKey)
+            return h(ElText,
+                { onClick: () => headerClick(dataKey) },
+                { default: () => [title, ' ', dataKey === sortColumn.value ? (sortType.value === 'asc' ? '↑' : sortType.value === 'desc' ? '↓' : '') : ''] }
             )
         }
     }
