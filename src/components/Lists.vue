@@ -83,6 +83,8 @@ const selectedOption = ref('')
 const columnOptions = [
     { label: 'Symbol', prop: 'symbol', disable: true, width: 150 },
     { label: 'Last Price', prop: 'lastPr' },
+    { label: 'UTC %', prop: 'changeUtc24h' },
+    { label: '24h %', prop: 'change24h' },
     { label: 'Open', prop: 'open' },
     { label: 'Open UTC', prop: 'openUtc' },
     { label: '24h High', prop: 'high24h' },
@@ -92,8 +94,6 @@ const columnOptions = [
     { label: 'USDT Volume', prop: 'usdtVolume' },
     { label: 'Bid', prop: 'bid' },
     { label: 'Ask', prop: 'ask' },
-    { label: 'UTC 24h %', prop: 'changeUtc24h' },
-    { label: '24h %', prop: 'change24h' },
 ]
 const minValue = ref<number | null>()
 const maxValue = ref<number | null>()
@@ -111,19 +111,13 @@ const columns: Column<Ticker> = columnOptions.map(op => {
         cellRenderer: ({ cellData }: { cellData: string }) =>
             op.prop === 'symbol'
                 ? h(ElText, { class: 'symbol-col', onClick: () => openLinkHandler(cellData) }, { default: () => h('a', {}, { default: () => cellData }) })
-                : h(ElText, { class: 'number-col', style: op.prop === 'changeUtc24h' || op.prop === 'change24h' ? { 'color': Number(cellData) >= 0 ? 'green' : 'red' } : {} }, { default: () => numberFormat(cellData) })
+                : h(ElText, { class: 'number-col', style: ['changeUtc24h', 'change24h'].includes(op.prop) ? { 'color': Number(cellData) >= 0 ? 'green' : 'red' } : {} }, { default: () => numberFormat(cellData) })
         ,
         headerCellRenderer: ({ column }: { column: Column<Ticker> }) => {
             return h(
                 ElText,
                 { onClick: () => headerClick(column, null) },
-                {
-                    default: () => [
-                        column.title,
-                        ' ',
-                        column.dataKey === sortColumn.value ? (sortType.value === 'asc' ? '↑' : sortType.value === 'desc' ? '↓' : '') : ''
-                    ]
-                }
+                { default: () => [column.title, ' ', column.dataKey === sortColumn.value ? (sortType.value === 'asc' ? '↑' : sortType.value === 'desc' ? '↓' : '') : ''] }
             )
         }
     }
@@ -140,15 +134,15 @@ const columns: Column<Ticker> = columnOptions.map(op => {
         </el-button>
         <el-input class="col search" size="small" v-model="search" :clearable="true" :placeholder="'搜索 Symbol'" />
         <el-select class="col" v-model="selectedOption" placeholder="列过滤" size="small" style="width: 120px"
-            @change="selectChanged">
+            :clearable="true" @change="selectChanged">
             <template v-for="item in columnOptions">
                 <el-option :key="item.prop" :label="item.label" :value="item.prop" v-if="!item.disable" />
             </template>
         </el-select>
         <el-input v-if="!!selectedOption" class="col" v-model="minValue" style="width: 120px" size="small" placeholder="下限"
-            type="number" />
+            type="number" :clearable="true" />
         <el-input v-if="!!selectedOption" class="col" v-model="maxValue" style="width: 120px" size="small" placeholder="上限"
-            type="number" />
+            type="number" :clearable="true" />
         <el-text class="col">共 {{ count }} 行</el-text>
         <!-- <el-button class="col" size="small" @click="doFilter">过滤</el-button> -->
     </div>
