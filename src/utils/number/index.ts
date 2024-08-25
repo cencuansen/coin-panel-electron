@@ -6,7 +6,7 @@ export function paddingZero(num: number) {
     }
 }
 
-export function numberFormat(price: number | string | undefined): string {
+export function numberFormat(price: number | string | undefined): number | string {
     if (price === null || price === undefined) {
         return ""
     }
@@ -14,20 +14,21 @@ export function numberFormat(price: number | string | undefined): string {
     if (isNaN(num)) {
         return ""
     }
-    const scale = 5
-    if (Math.abs(num) >= 1) {
-        return num.toFixed(scale)
-    } else {
-        if (num * 1000 < 1) {
-            let fractionals: string[] = ("" + price).split(".")
-            if (fractionals.length === 1) {
-                return num.toFixed(scale)
-            }
-            const fractional = fractionals[1]
-            let nonZeroIndex: number = fractional.split("").findIndex(c => Number(c) > 0)
-            let nonZeroPart = fractional.substring(nonZeroIndex, Math.min(nonZeroIndex + 3, fractional.length))
-            return `0.0{${nonZeroIndex}}${nonZeroPart}`
+    if (num > 1e9) {
+        return `${Math.floor(num / 1e9)}e9`
+    } if (Math.abs(num) >= 100) {
+        return Number(num.toFixed(2))
+    } else if (Math.abs(num) >= 1) {
+        return Number(num.toFixed(3))
+    } if (Math.abs(num * 1000) < 1) {
+        let fractionals: string[] = ("" + price).split(".")
+        if (fractionals.length === 1) {
+            return Number(num.toFixed(5))
         }
+        const fractional = fractionals[1]
+        let nonZeroIndex: number = fractional.split("").findIndex(c => Number(c) > 0)
+        let nonZeroPart = fractional.substring(nonZeroIndex, Math.min(nonZeroIndex + 3, fractional.length))
+        return `0.0{${nonZeroIndex}}${nonZeroPart}`
     }
-    return num.toFixed(scale)
+    return Number(num.toFixed(5))
 }

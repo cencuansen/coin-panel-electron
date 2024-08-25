@@ -1,17 +1,18 @@
 <script setup lang="ts">
-import { DefineComponent, ref } from 'vue'
+import { DefineComponent, shallowRef, ref } from 'vue'
 import Favorites from './components/Favorites.vue'
 import Lists from './components/Lists.vue'
 import Settings from './components/Settings.vue'
 
-const components = ref<{ [key: string]: DefineComponent<any, any, any> }>({
+const components = shallowRef<{ [key: string]: DefineComponent<any, any, any> }>({
   "favorites": Favorites,
   "lists": Lists,
   "settings": Settings,
 })
+const currentComponent = shallowRef<DefineComponent<any, any, any>>(Favorites)
 
 const currentComponentName = ref<string>("favorites")
-const currentComponent = ref<DefineComponent<any, any, any>>(Favorites)
+
 
 function switchComponent(name: string) {
   currentComponentName.value = name

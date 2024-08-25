@@ -38,6 +38,8 @@ async function createWindow() {
     webPreferences,
   })
 
+  win.maximize()
+
   if (process.env.VITE_DEV_SERVER_URL) {
     win.loadURL(url)
   } else {
@@ -129,7 +131,7 @@ ipcMain.on("toggle-devtools", function (event, open: boolean) {
 })
 
 function openDevtools() {
-  win.restore()
+  if (!win) return
   win.focus()
   if (isDevToolsOpen) {
     win?.webContents.closeDevTools()

@@ -1,6 +1,5 @@
 import axios1 from 'axios'
 import { shell } from "electron"
-import { numberFormat } from '../utils/number/index'
 import { TickerData, SnapshotResponse, SubscribeResponse, ApiResponse, TradingPair, Ticker, TradingPairsResponse, HistoryCandlesResponse, TickerResponse } from "./types"
 
 export const bgHttpHost = "https://api.bitget.com"
@@ -22,7 +21,7 @@ export function openLink(symbol: string) {
     if (!symbol) {
         return
     }
-    shell.openExternal(`${bgHost}/zh-CN/spot/${symbol}?type=spot`)
+    shell.openExternal(`${bgHost}/zh-CN/spot/${symbol}`)
 }
 
 export async function allPairsFun(): Promise<TradingPair[]> {
@@ -57,9 +56,10 @@ export async function allTickersFun(): Promise<Ticker[]> {
     const result: TickerResponse = response.data
     const tickers: Ticker[] = result.data
     for (let i = 0; i < tickers.length; i++) {
+        tickers[i].ask = tickers[i].askPr * tickers[i].askSz
+        tickers[i].bid = tickers[i].bidPr * tickers[i].bidSz
         tickers[i].change24h = tickers[i].change24h * 100
         tickers[i].changeUtc24h = tickers[i].changeUtc24h * 100
     }
-    tickers.sort((a, b) => a.symbol.localeCompare(b.symbol))
     return tickers
 }
