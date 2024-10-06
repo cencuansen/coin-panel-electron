@@ -8,6 +8,7 @@ import pkg from './package.json'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
+import vueJsx from '@vitejs/plugin-vue-jsx'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => {
@@ -20,6 +21,7 @@ export default defineConfig(({ command }) => {
   return {
     plugins: [
       vue(),
+      vueJsx(),
       electron([
         {
           // Main-Process entry file of the Electron App.

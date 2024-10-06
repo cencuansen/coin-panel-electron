@@ -3,11 +3,13 @@ import { DefineComponent, shallowRef, ref } from 'vue'
 import Favorites from './components/Favorites.vue'
 import Lists from './components/Lists.vue'
 import Settings from './components/Settings.vue'
+import PriceBoard from './components/PriceBoard.vue'
 
 const components = shallowRef<{ [key: string]: DefineComponent<any, any, any> }>({
   "favorites": Favorites,
   "lists": Lists,
   "settings": Settings,
+  "priceBoard": PriceBoard,
 })
 const currentComponent = shallowRef<DefineComponent<any, any, any>>(Favorites)
 
@@ -41,6 +43,11 @@ const buttonType = (name: string) => currentComponentName.value === name ? 'prim
         <el-button :type="buttonType('lists')" size="small" @click="switchComponent('lists')" title="全部">
           <el-icon>
             <List />
+          </el-icon>
+        </el-button>
+        <el-button :type="buttonType('priceBoard')" size="small" @click="switchComponent('priceBoard')" title="更多行情">
+          <el-icon>
+            <More />
           </el-icon>
         </el-button>
         <el-button :type="buttonType('settings')" size="small" @click="switchComponent('settings')" title="设置">
