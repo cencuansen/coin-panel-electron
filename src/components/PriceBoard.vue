@@ -51,13 +51,13 @@ const exchanges = ref<Exchange[]>([
 ])
 
 const starCacheKey = 'starPriceData'
+const intervalCacheKey = 'priceBoardUpdatePeriod'
 const priceData = ref<Record<string, PriceData[]>>({})
 const starPriceData = ref<PriceData[]>([])
 const errors = ref<Record<string, string>>({})
 
 const fetchPrices = async (exchange: Exchange) => {
   try {
-    updateTime.value = new Date().toLocaleString()
     const response = await fetch(exchange.url)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
@@ -108,7 +108,7 @@ const columns: Column<any>[] = [
     width: 50,
     cellRenderer: (params: CellRendererParams<string>) => {
       const data: string = params.cellData
-      return h(ElText, { class: 'star-btn', onClick: () => addStar(data) }, { default: () => h('span', {}, { default: () => '✰' }) })
+      return h(ElText, { style: { 'cursor': 'pointer', 'fontSize': '20px' }, onClick: () => addStar(data) }, { default: () => h('span', {}, { default: () => '✰' }) })
     },
   }, {
     key: 'symbol',
@@ -185,7 +185,7 @@ const search = ref('')
 const selectedCexOption = ref(exchanges.value[0].name)
 
 async function selectChanged(value: string) {
-  await updateOnePrices()
+
 }
 const count = ref(0)
 const computedTickers = computed(() => {
@@ -210,12 +210,10 @@ const staredTickers = computed(() => {
   return result
 })
 
-const updateTime = ref(new Date().toLocaleString())
-const updateOnePrices = async () => {
-  await fetchPrices(exchanges.value.filter(ex => selectedCexOption.value === ex.name)[0])
-}
+const updateTime = ref(new Date().toLocaleTimeString())
 
 const updateAllPrices = async () => {
+  updateTime.value = new Date().toLocaleTimeString()
   exchanges.value.forEach(fetchPrices)
 }
 
@@ -243,14 +241,23 @@ onMounted(() => {
   starPriceData.value = JSON.parse(localStorage.getItem(starCacheKey) || '[]')
 })
 
-// watch(() => exchanges.value, updatePrices, { deep: true })
+const defaultInterval = 30
+const interval = ref(Number(localStorage.getItem(intervalCacheKey) || defaultInterval))
+let timer = setInterval(updateAllPrices, interval.value * 1000)
 
-setInterval(updateAllPrices, 10000) // Update prices every 10 seconds
+function updateInterval() {
+  clearInterval(timer)
+  if (!interval.value || interval.value < defaultInterval) {
+    interval.value = defaultInterval
+  }
+  localStorage.setItem(intervalCacheKey, String(interval.value))
+  timer = setInterval(updateAllPrices, interval.value * 1000)
+}
 </script>
 
 <template>
   <div class="price-board">
-    <div class="row">
+    <div class="header row">
       <el-select class="col" v-model="selectedCexOption" placeholder="列过滤" size="small" style="width: 150px"
         :clearable="true" @change="selectChanged">
         <template v-for="item in exchanges" :key="item.prop">
@@ -259,20 +266,26 @@ setInterval(updateAllPrices, 10000) // Update prices every 10 seconds
       </el-select>
       <el-input class="col search" size="small" v-model="search" :clearable="true" :placeholder="'搜索 Symbol'" />
       <el-text class="col">共 {{ count }} 行</el-text>
-      <el-text class="col">更新时间：{{ updateTime }}</el-text>
+      <el-text class="col">更新时间: {{ updateTime }}</el-text>
+      <el-text class="col">更新周期(s): </el-text>
+      <el-input-number class="col interval-input" v-model="interval" :min="30" :max="9999" controls-position=""
+        size="small" @blur="updateInterval()"></el-input-number>
     </div>
     <div class="row">
-      <el-table-v2 :columns="columns" :data="computedTickers || []" :width="500" :height="900" />
-      <!-- <el-table-v2 :columns="starColumns" :data="staredTickers || []" :width="500" :height="900" /> -->
+      <el-table-v2 :columns="columns" :data="computedTickers || []" :width="400" :height="900" />
       <el-table id="dragTable" style="font-weight: bold; width: 500px;" :data="staredTickers" :row-key="item => item.key"
         empty-text="暂无数据">
         <el-table-column label="" width="40px" :show-overflow-tooltip="true">
           <template #default="scope">
-            <el-text>❤️</el-text>
+            <el-text @click="unstar(scope.row.key)" style="cursor: pointer;font-size: 15px;">❤️</el-text>
           </template>
         </el-table-column>
-        <el-table-column label="exchange" prop="exchange" width="100px" :show-overflow-tooltip="true"></el-table-column>
-        <el-table-column label="symbol" prop="symbol" :show-overflow-tooltip="true"></el-table-column>
+        <el-table-column label="symbol" :show-overflow-tooltip="true">
+          <template #default="scope">
+            <div><el-text style="color: #ffff00;">{{ scope.row.symbol }}</el-text></div>
+            <div><el-text style="font-size: 9px;">{{ scope.row.exchange }}</el-text></div>
+          </template>
+        </el-table-column>
         <el-table-column label="price" prop="price" :show-overflow-tooltip="true"></el-table-column>
         <el-table-column label="操作" width="80">
           <template #default="scope">
@@ -298,6 +311,13 @@ setInterval(updateAllPrices, 10000) // Update prices every 10 seconds
   /* 设置行高 */
 }
 
+.header {
+  display: flex;
+  position: relative;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
 .row {
   display: flex;
   position: relative;
@@ -312,7 +332,9 @@ setInterval(updateAllPrices, 10000) // Update prices every 10 seconds
   width: 200px;
 }
 
-.star-btn {
-  cursor: pointer;
+.interval-input {
+  width: 100px;
+  height: 18px;
+  margin-top: 4px;
 }
 </style>
